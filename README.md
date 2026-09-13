@@ -1,1 +1,1 @@
-Heartopia Game Index v2. Static database imported from the supplied spreadsheet and database document. Personal progress is stored locally in each user's browser/device, so users have independent progress.
+Heartopia Game Index v2. Static database imported from the supplied spreadsheet and database document. Personal progress is stored locally in each user's browser/device, so friends have independent progress.
