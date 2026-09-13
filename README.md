@@ -1,12 +1,1 @@
-# Game Index — Heartopia v1
-
-This is the first Heartopia-focused version. It is designed for iPhone Safari and saves data locally on the device/browser.
-
-Included:
-- DG Level + 5 daily tasks + 1 weekly task
-- Hobbies + editable proficiency levels/notes
-- Hobby collections
-- Mastery Verifications
-- Animal Bonds + Limited-Time Animal Bonds
-- Events / Festivals / Fashionwaves
-- Index / Wiki
+Heartopia Game Index v2. Static database imported from the supplied spreadsheet and database document. Personal progress is stored locally in each user's browser/device, so friends have independent progress.

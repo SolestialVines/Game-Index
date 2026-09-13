@@ -1,657 +1,89 @@
-const app = document.getElementById("app");
 
-/* -----------------------------
-   HEARTOPIA DATA
------------------------------ */
-
-let masteryData = JSON.parse(
-  localStorage.getItem("heartopiaMastery")
-) || [
-  {
-    category: "Insects",
-    items: [
-      {
-        name: "Bagworm Moth",
-        current: 0,
-        required: 300
-      }
-    ]
-  },
-  {
-    category: "Flowers",
-    items: []
-  },
-  {
-    category: "Crops",
-    items: []
-  },
-  {
-    category: "Cooking",
-    items: []
-  },
-  {
-    category: "Birds",
-    items: []
-  },
-  {
-    category: "Fish",
-    items: []
-  },
-  {
-    category: "Shells",
-    items: []
-  }
+const DB=window.GAME_DB;
+const app=document.getElementById("app");
+const STORE_KEY="gameIndexProgressV2";
+let progress=JSON.parse(localStorage.getItem(STORE_KEY)||"null")||{
+ dg:{level:42,current:0},
+ mastery:{}, stars:{}, obtained:{}, bondLevels:{}, bondFavs:{}, petFood:{cats:{},dogs:{}}, hobbyLevels:{}, hobbyNotes:{}, collectionItems:{}, customEvents:[]
+};
+function save(){localStorage.setItem(STORE_KEY,JSON.stringify(progress))}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]))}
+function getId(name){return name.toLowerCase().replace(/[^a-z0-9]+/g,"-")}
+function masteryKey(type,name){return `${type}:${name}`}
+function star(name,type){return progress.stars[masteryKey(type,name)]??1}
+function current(type,name){return progress.mastery[masteryKey(type,name)]??0}
+function setCurrent(type,name,n){progress.mastery[masteryKey(type,name)]=Math.max(0,Math.floor(Number(n)||0));save()}
+function setStar(type,name,n){progress.stars[masteryKey(type,name)]=Math.max(1,Math.min(5,Number(n)||1));save()}
+function header(title,sub,backText="Heartopia",back="home"){
+return `<header>${back?`<button class="back" onclick="go('${back}')">‹ ${esc(backText)}</button>`:""}<div class="eyebrow">GAME INDEX</div><h1>${esc(title)}</h1>${sub?`<p class="subtitle">${esc(sub)}</p>`:""}</header>`}
+function go(v){render(v)}
+function render(v="home"){window.currentView=v; if(v==="home")home();else if(v==="game")game();else if(v==="mastery")masteryHome();else if(v.startsWith("mastery:"))masteryCategory(v.split(":")[1]);else if(v==="wiki")wikiHome();else if(v.startsWith("wiki:"))wikiCategory(v.split(":")[1]);else if(v==="pets")petsHome();else if(v.startsWith("pet:"))petDetail(v.split(":")[1]);else if(v==="hobbies")hobbies();else if(v.startsWith("hobby:"))hobbyDetail(Number(v.split(":")[1]));else if(v==="collections")collections();else if(v==="tasks")tasks();else if(v==="animals")animals();else if(v==="events")events()}
+function home(){app.innerHTML=header("Game Index","Your personal gaming wiki & tracker","",null)+`<main>
+<div class="game-card" onclick="go('game')"><div class="game-art">🌸</div><div><div class="eyebrow">GAME</div><h2>Heartopia</h2><p>Personal index, collections & progress</p></div><span>›</span></div>
+</main>`}
+const sections=[
+["tasks","📅","Daily & Weekly Tasks","DG Level and contribution"],
+["hobbies","🌿","Hobbies","Proficiency, notable levels & unlocks"],
+["collections","🗃️","Collections","Your obtained items"],
+["mastery","🏅","Mastery Verifications","Track quantity-based mastery"],
+["animals","🐾","Animal Bonds","Bond levels, foods & unlocks"],
+["events","✨","Events & Fashionwaves","Limited-time collections & gacha"],
+["wiki","📖","Index / Wiki","Searchable game reference"],
+["pets","🐶","Pets","Food trials & pinned favourites"]
 ];
+function game(){let dg=DB.dgLevels.find(x=>x.level===progress.dg.level+1);let req=dg?.required??0,pct=req?Math.min(100,Math.round(progress.dg.current/req*100)):100;
+app.innerHTML=header("Heartopia","Your personal game guide")+`<main>
+<div class="hero"><div class="hero-top"><div><div class="eyebrow">DG LEVEL</div><div class="level">${progress.dg.level}</div><div class="subtitle">${progress.dg.current} / ${req} contribution to Level ${progress.dg.level+1}</div></div><div class="hero-icon">🌸</div></div><div class="bar"><i style="width:${pct}%"></i></div></div>
+<div class="section-list">${sections.map(s=>`<button class="nav-card" onclick="go('${s[0]}')"><span class="nav-icon">${s[1]}</span><span class="grow"><b>${s[2]}</b><small>${s[3]}</small></span><span>›</span></button>`).join("")}</div>
+</main>`}
+function tasks(){let dg=DB.dgLevels.find(x=>x.level===progress.dg.level+1);let req=dg?.required??0;
+app.innerHTML=header("Daily & Weekly Tasks","5 daily tasks + 1 weekly task")+`<main><div class="card"><div class="eyebrow">DG LEVEL</div><div class="level">${progress.dg.level}</div><p>${progress.dg.current} / ${req} contribution points</p><div class="bar"><i style="width:${req?Math.min(100,progress.dg.current/req*100):100}%"></i></div><button class="primary" onclick="addContribution()">＋ Add contribution</button></div><div class="section-title"><h2>Daily Tasks</h2></div><div class="card list">${[1,2,3,4,5].map((n,i)=>`<label class="checkrow"><input type="checkbox" ${progress[`daily${i}`]?'checked':''} onchange="daily(${i},this.checked)"><span>Daily Task ${n}</span><em>+10</em></label>`).join("")}</div><div class="section-title"><h2>Weekly Task</h2></div><div class="card"><label class="checkrow"><input type="checkbox" ${progress.weekly?'checked':''} onchange="progress.weekly=this.checked;save()"><span>Weekly Task</span></label></div></main>`}
+function daily(i,on){progress["daily"+i]=on; if(on)progress.dg.current+=10;else progress.dg.current=Math.max(0,progress.dg.current-10);save();tasks()}
+function addContribution(){let n=prompt("Contribution points to add",10);if(n!==null){progress.dg.current=Math.max(0,Number(progress.dg.current)+Number(n||0));save();tasks()}}
 
-function saveMastery() {
-  localStorage.setItem(
-    "heartopiaMastery",
-    JSON.stringify(masteryData)
-  );
-}
-
-/* -----------------------------
-   MAIN SECTIONS
------------------------------ */
-
-const sections = [
-  {
-    id: "tasks",
-    icon: "📅",
-    title: "Daily & Weekly Tasks",
-    description: "DG Level and contribution tasks"
-  },
-  {
-    id: "hobbies",
-    icon: "🌿",
-    title: "Hobbies",
-    description: "Levels, proficiency and unlocks"
-  },
-  {
-    id: "collections",
-    icon: "🗃️",
-    title: "Collections",
-    description: "Track everything you've obtained"
-  },
-  {
-    id: "mastery",
-    icon: "🏅",
-    title: "Mastery Verifications",
-    description: "Track mastery progress"
-  },
-  {
-    id: "animals",
-    icon: "🐾",
-    title: "Animal Bonds",
-    description: "Bond levels and rewards"
-  },
-  {
-    id: "events",
-    icon: "✨",
-    title: "Events & Fashionwaves",
-    description: "Limited-time collections and gacha"
-  },
-  {
-    id: "wiki",
-    icon: "📖",
-    title: "Index / Wiki",
-    description: "Your personal Heartopia reference"
-  }
+const masteryGroups=[
+["flowers","Flowers","🌷",DB.flowers, "Flower"],
+["crops","Crops","🌱",DB.crops,"Crop"],
+["recipes","Cooking","🍳",DB.recipes,"Recipe"],
+["bugs","Insects","🦋",DB.bugs,"Insects"],
+["birds","Birds","🐦",DB.birds,"Birds"],
+["fish","Fish","🐟",DB.fish,"Fish"],
+["shells","Shells","🐚",DB.shells,"Shell"]
 ];
-
-/* -----------------------------
-   HOME
------------------------------ */
-
-function renderHome() {
-  app.innerHTML = `
-    <header>
-      <div class="eyebrow">GAME INDEX</div>
-      <h1>Heartopia</h1>
-      <p class="subtitle">Your personal game guide</p>
-    </header>
-
-    <main>
-
-      <section class="hero">
-        <div class="hero-icon">🌸</div>
-
-        <div class="hero-content">
-          <div class="eyebrow">DG LEVEL</div>
-
-          <div class="level-number">
-            42
-          </div>
-
-          <p>
-            220 contribution points required for Level 43
-          </p>
-
-          <div class="progress">
-            <div
-              class="progress-bar"
-              style="width: 0%"
-            ></div>
-          </div>
-
-          <div class="progress-text">
-            <span>0 / 220</span>
-            <span>Level 43</span>
-          </div>
-        </div>
-      </section>
-
-      <div class="section-heading">
-        <h2>Heartopia</h2>
-        <span>7 sections</span>
-      </div>
-
-      <div class="section-list">
-
-        ${sections.map(section => `
-          <button
-            class="section-card"
-            onclick="openSection('${section.id}')"
-          >
-
-            <div class="section-icon">
-              ${section.icon}
-            </div>
-
-            <div class="section-info">
-
-              <h3>
-                ${section.title}
-              </h3>
-
-              <p>
-                ${section.description}
-              </p>
-
-            </div>
-
-            <div class="arrow">
-              ›
-            </div>
-
-          </button>
-        `).join("")}
-
-      </div>
-
-    </main>
-  `;
-}
-
-/* -----------------------------
-   SECTION NAVIGATION
------------------------------ */
-
-function openSection(id) {
-
-  if (id === "mastery") {
-    renderMastery();
-    return;
-  }
-
-  const section = sections.find(
-    section => section.id === id
-  );
-
-  app.innerHTML = `
-    <header>
-
-      <button
-        class="back-button"
-        onclick="renderHome()"
-      >
-        ‹ Heartopia
-      </button>
-
-      <div class="eyebrow">
-        ${section.icon}
-      </div>
-
-      <h1>
-        ${section.title}
-      </h1>
-
-      <p class="subtitle">
-        ${section.description}
-      </p>
-
-    </header>
-
-    <main>
-
-      <div class="empty-section">
-
-        <div class="empty-icon">
-          ${section.icon}
-        </div>
-
-        <h2>
-          ${section.title}
-        </h2>
-
-        <p>
-          This section is ready to be built.
-        </p>
-
-        <button class="primary-button">
-          ＋ Add
-        </button>
-
-      </div>
-
-    </main>
-  `;
-}
-
-/* -----------------------------
-   MASTERY HOME
------------------------------ */
-
-function renderMastery() {
-
-  app.innerHTML = `
-    <header>
-
-      <button
-        class="back-button"
-        onclick="renderHome()"
-      >
-        ‹ Heartopia
-      </button>
-
-      <div class="eyebrow">
-        🏅 MASTERY
-      </div>
-
-      <h1>
-        Mastery Verifications
-      </h1>
-
-      <p class="subtitle">
-        Track your progress towards mastery.
-      </p>
-
-    </header>
-
-    <main>
-
-      <div class="section-list">
-
-        ${masteryData.map((category, index) => `
-
-          <button
-            class="section-card"
-            onclick="openMasteryCategory(${index})"
-          >
-
-            <div class="section-icon">
-              ${getCategoryIcon(category.category)}
-            </div>
-
-            <div class="section-info">
-
-              <h3>
-                ${category.category}
-              </h3>
-
-              <p>
-                ${category.items.length}
-                ${category.items.length === 1 ? "item" : "items"}
-              </p>
-
-            </div>
-
-            <div class="arrow">
-              ›
-            </div>
-
-          </button>
-
-        `).join("")}
-
-      </div>
-
-    </main>
-  `;
-}
-
-/* -----------------------------
-   CATEGORY
------------------------------ */
-
-function openMasteryCategory(index) {
-
-  const category = masteryData[index];
-
-  app.innerHTML = `
-    <header>
-
-      <button
-        class="back-button"
-        onclick="renderMastery()"
-      >
-        ‹ Mastery
-      </button>
-
-      <div class="eyebrow">
-        ${getCategoryIcon(category.category)}
-      </div>
-
-      <h1>
-        ${category.category}
-      </h1>
-
-      <p class="subtitle">
-        ${category.items.length} items
-      </p>
-
-    </header>
-
-    <main>
-
-      ${
-        category.items.length === 0
-          ? `
-            <div class="empty-section">
-
-              <div class="empty-icon">
-                ${getCategoryIcon(category.category)}
-              </div>
-
-              <h2>
-                Nothing here yet
-              </h2>
-
-              <p>
-                Add your first mastery item.
-              </p>
-
-            </div>
-          `
-          : `
-            <div class="mastery-list">
-
-              ${category.items.map((item, itemIndex) =>
-                masteryCard(
-                  index,
-                  itemIndex,
-                  item
-                )
-              ).join("")}
-
-            </div>
-          `
-      }
-
-      <button
-        class="primary-button add-mastery"
-        onclick="addMasteryItem(${index})"
-      >
-        ＋ Add Mastery
-      </button>
-
-    </main>
-  `;
-}
-
-/* -----------------------------
-   MASTERY CARD
------------------------------ */
-
-function masteryCard(
-  categoryIndex,
-  itemIndex,
-  item
-) {
-
-  const percentage = Math.min(
-    100,
-    Math.round(
-      (item.current / item.required) * 100
-    )
-  );
-
-  const remaining = Math.max(
-    0,
-    item.required - item.current
-  );
-
-  const mastered =
-    item.current >= item.required;
-
-  return `
-    <div class="mastery-card">
-
-      <div class="mastery-top">
-
-        <div>
-
-          <h3>
-            ${item.name}
-          </h3>
-
-          <p class="mastery-count">
-
-            ${item.current}
-            /
-            ${item.required}
-
-            ${
-              mastered
-                ? " • Mastered ✓"
-                : ""
-            }
-
-          </p>
-
-        </div>
-
-        <div class="mastery-percent">
-          ${percentage}%
-        </div>
-
-      </div>
-
-      <div class="progress mastery-progress">
-
-        <div
-          class="progress-bar"
-          style="width:${percentage}%"
-        ></div>
-
-      </div>
-
-      <div class="mastery-bottom">
-
-        <span>
-
-          ${
-            mastered
-              ? "✓ Mastery complete"
-              : `${remaining} remaining`
-          }
-
-        </span>
-
-      </div>
-
-      <div class="mastery-controls">
-
-        <button
-          class="quantity-button"
-          onclick="changeMastery(
-            ${categoryIndex},
-            ${itemIndex},
-            -1
-          )"
-        >
-          −
-        </button>
-
-        <button
-          class="quantity-button add"
-          onclick="changeMastery(
-            ${categoryIndex},
-            ${itemIndex},
-            1
-          )"
-        >
-          +
-        </button>
-
-        <button
-          class="quantity-button"
-          onclick="setMasteryAmount(
-            ${categoryIndex},
-            ${itemIndex}
-          )"
-        >
-          Set amount
-        </button>
-
-      </div>
-
-    </div>
-  `;
-}
-
-/* -----------------------------
-   CHANGE AMOUNT
------------------------------ */
-
-function changeMastery(
-  categoryIndex,
-  itemIndex,
-  amount
-) {
-
-  const item =
-    masteryData[categoryIndex].items[itemIndex];
-
-  item.current = Math.max(
-    0,
-    Math.min(
-      item.required,
-      item.current + amount
-    )
-  );
-
-  saveMastery();
-
-  openMasteryCategory(categoryIndex);
-}
-
-/* -----------------------------
-   SET AMOUNT
------------------------------ */
-
-function setMasteryAmount(
-  categoryIndex,
-  itemIndex
-) {
-
-  const item =
-    masteryData[categoryIndex].items[itemIndex];
-
-  const amount = prompt(
-    `How many ${item.name} have you collected?`,
-    item.current
-  );
-
-  if (amount === null) {
-    return;
-  }
-
-  const number = Number(amount);
-
-  if (!Number.isFinite(number)) {
-    alert("Please enter a number.");
-    return;
-  }
-
-  item.current = Math.max(
-    0,
-    Math.min(
-      item.required,
-      Math.floor(number)
-    )
-  );
-
-  saveMastery();
-
-  openMasteryCategory(categoryIndex);
-}
-
-/* -----------------------------
-   ADD MASTERY ITEM
------------------------------ */
-
-function addMasteryItem(categoryIndex) {
-
-  const name = prompt(
-    "What are you mastering?"
-  );
-
-  if (!name) {
-    return;
-  }
-
-  const required = prompt(
-    `How many ${name} are required for mastery?`,
-    "300"
-  );
-
-  if (required === null) {
-    return;
-  }
-
-  const requiredNumber = Number(required);
-
-  if (
-    !Number.isFinite(requiredNumber) ||
-    requiredNumber <= 0
-  ) {
-    alert("Please enter a valid number.");
-    return;
-  }
-
-  masteryData[categoryIndex].items.push({
-    name: name,
-    current: 0,
-    required: Math.floor(requiredNumber)
-  });
-
-  saveMastery();
-
-  openMasteryCategory(categoryIndex);
-}
-
-/* -----------------------------
-   CATEGORY ICONS
------------------------------ */
-
-function getCategoryIcon(category) {
-
-  const icons = {
-    Flowers: "🌷",
-    Crops: "🌱",
-    Cooking: "🍳",
-    Insects: "🦋",
-    Birds: "🐦",
-    Fish: "🐟",
-    Shells: "🐚"
-  };
-
-  return icons[category] || "🏅";
-}
-
-/* -----------------------------
-   START APP
------------------------------ */
-
-renderHome();
+function masteryHome(){app.innerHTML=header("Mastery Verifications","Current progress starts at 0 for every item")+`<main><div class="section-list">${masteryGroups.map(g=>`<button class="nav-card" onclick="go('mastery:${g[0]}')"><span class="nav-icon">${g[2]}</span><span class="grow"><b>${g[1]}</b><small>${g[3].length} items</small></span><span>›</span></button>`).join("")}</div></main>`}
+function itemName(type,r){return type==="shells"?r.Shell:r[type==="flowers"?"Flower":type==="crops"?"Crop":type==="recipes"?"Recipe":type==="bugs"?"Insects":type==="birds"?"Birds":"Fish"]}
+function requiredFor(type,r){let x=type==="shells"?r.Mastery:r[type==="bugs"?"Mastery #":type==="fish"?"Mastery (Obtain x times)":type==="birds"?"Mastery (Obtain x times)":type==="crops"||type==="flowers"?type==="crops"?"Mastery Verification":"Mastery Verification":"mastery"];return Number(x)||0}
+function masteryCategory(type){let g=masteryGroups.find(x=>x[0]===type), rows=g[3];app.innerHTML=header(g[1],`${rows.length} database entries`,"Mastery","mastery")+`<main><div class="searchbox"><input placeholder="Search ${g[1]}..." oninput="filterCards(this.value,'masteryCards')"></div><div id="masteryCards" class="listcards">${rows.map((r,i)=>masteryCard(type,r,i)).join("")}</div></main>`}
+function masteryCard(type,r,i){let name=itemName(type,r),req=requiredFor(type,r),cur=current(type,name),pct=req?Math.min(100,Math.round(cur/req*100)):0,s=star(type,name);return `<div class="mastery-card"><div class="row between"><div><h3>${esc(name)}</h3><small>${req?`${cur.toLocaleString()} / ${req.toLocaleString()} mastered`:"Mastery not applicable"}</small></div><span class="percent">${req?pct+"%":"—"}</span></div>${req?`<div class="bar"><i style="width:${pct}%"></i></div>`:""}<div class="meta">${details(type,r)}${req?`<span>⭐ ${s}</span>`:""}</div>${req?`<div class="controls"><button onclick="changeMastery('${type}',${i},-1)">−</button><button onclick="changeMastery('${type}',${i},1)">＋</button><button class="set" onclick="setMastery('${type}',${i})">Set amount</button><select onchange="setStar('${type}','${esc(name)}',this.value)">${[1,2,3,4,5].map(n=>`<option ${s===n?"selected":""} value="${n}">⭐ ${n}</option>`).join("")}</select></div>`:""}</div>`}
+function details(type,r){let bits=[];if(r.Location)bits.push(`📍 ${r.Location}`);if(r.Time)bits.push(`🕐 ${r.Time}`);if(r.Weather)bits.push(`☁️ ${r.Weather}`);if(r["Growth Time"])bits.push(`⏱ ${r["Growth Time"]}`);return bits.map(x=>`<span>${esc(x)}</span>`).join("")}
+function changeMastery(type,i,d){let r=masteryGroups.find(x=>x[0]===type)[3][i],n=itemName(type,r),req=requiredFor(type,r);setCurrent(type,n,Math.min(req,current(type,n)+d));masteryCategory(type)}
+function setMastery(type,i){let r=masteryGroups.find(x=>x[0]===type)[3][i],n=itemName(type,r),v=prompt(`How many ${n} have you collected?`,current(type,n));if(v!==null){setCurrent(type,n,v);masteryCategory(type)}}
+function filterCards(q,id){q=q.toLowerCase();document.querySelectorAll("#"+id+" > div").forEach(x=>x.style.display=x.innerText.toLowerCase().includes(q)?"":"none")}
+
+function hobbies(){app.innerHTML=header("Hobbies","Update your current level and keep unlock notes")+`<main><div class="listcards">${DB.hobbies.map((h,i)=>`<button class="nav-card" onclick="go('hobby:${i}')"><span class="nav-icon">🌿</span><span class="grow"><b>${h.name}</b><small>Level ${progress.hobbyLevels[h.name]??0}</small></span><span>›</span></button>`).join("")}</div></main>`}
+function hobbyDetail(i){let h=DB.hobbies[i],level=progress.hobbyLevels[h.name]??0,notes=progress.hobbyNotes[h.name]??"";app.innerHTML=header(h.name,"Proficiency level & notable rewards","Hobbies","hobbies")+`<main><div class="card"><label class="field"><span>Current level</span><input id="hlevel" type="number" min="0" value="${level}"></label><button class="primary" onclick="saveHobby('${esc(h.name)}')">Save level & notes</button></div><div class="section-title"><h2>Notable levels & unlocks</h2></div><div class="card"><textarea id="hnotes" placeholder="e.g. Level 10 — unlocks ...">${esc(notes)}</textarea></div></main>`}
+function saveHobby(name){progress.hobbyLevels[name]=Number(document.getElementById("hlevel").value)||0;progress.hobbyNotes[name]=document.getElementById("hnotes").value;save();go("hobbies")}
+
+function collections(){let groups=[["Gardening","🌱"],["Cooking","🍳"],["Insect Catching","🦋"],["Bird Watching","🐦"],["Fishing","🐟"],["Ocean Clean Up","🌊"]];app.innerHTML=header("Collections","Track obtained items")+`<main><div class="listcards">${groups.map(g=>`<button class="nav-card"><span class="nav-icon">${g[1]}</span><span class="grow"><b>${g[0]}</b><small>Collection ready for database links</small></span><span>›</span></button>`).join("")}</div></main>`}
+
+function wikiHome(){let groups=[["characters","Characters","👥",DB.characters],["places","Notable Places & Shops","📍",[]],["fish","Fish","🐟",DB.fish],["flowers","Flowers & Cross Breeding","🌷",DB.flowers],["recipes","Cooking Recipes","🍳",DB.recipes],["bugs","Insects","🦋",DB.bugs],["birds","Birds","🐦",DB.birds],["crops","Crops","🌱",DB.crops],["shells","Shells","🐚",DB.shells]];app.innerHTML=header("Index / Wiki","Your permanent Heartopia reference")+`<main><div class="searchbox"><input placeholder="Search the wiki..." oninput="wikiSearch(this.value)"></div><div id="wikiGroups" class="listcards">${groups.map(g=>`<button class="nav-card" onclick="go('wiki:${g[0]}')"><span class="nav-icon">${g[2]}</span><span class="grow"><b>${g[1]}</b><small>${g[3].length?g[3].length+" entries":"Coming from database"}</small></span><span>›</span></button>`).join("")}</div></main>`}
+function wikiSearch(q){q=q.toLowerCase();document.querySelectorAll("#wikiGroups .nav-card").forEach(x=>x.style.display=x.innerText.toLowerCase().includes(q)?"":"none")}
+function wikiCategory(type){if(type==="fish")return wikiFish();let map={characters:DB.characters,flowers:DB.flowers,recipes:DB.recipes,bugs:DB.bugs,birds:DB.birds,crops:DB.crops,shells:DB.shells};let arr=map[type]||[];app.innerHTML=header(type==="characters"?"Characters":type==="flowers"?"Flowers & Cross Breeding":type==="recipes"?"Cooking Recipes":type==="bugs"?"Insects":type==="birds"?"Birds":type==="crops"?"Crops":"Shells",`${arr.length} entries`,"Index / Wiki","wiki")+`<main><div class="searchbox"><input placeholder="Search..." oninput="filterCards(this.value,'wikiList')"></div><div id="wikiList" class="listcards">${arr.map((r,i)=>{let n=itemName(type,r);return `<button class="nav-card"><span class="nav-icon">•</span><span class="grow"><b>${esc(n)}</b><small>${esc(details(type,r).replace(/<[^>]+>/g," "))}</small></span><span>›</span></button>`}).join("")}</div></main>`}
+function wikiFish(){let cats=[["Ocean Fish","🌊",DB.fish.filter(r=>r._group==="Ocean Fish")],["Lake Fish","🏞️",DB.fish.filter(r=>r._group==="Lake Fish")],["River Fish","🌿",DB.fish.filter(r=>r._group==="River Fish")],["Event Fish","✨",DB.fish.filter(r=>r._group==="Event Fish")],["Other Fish","🐟",DB.fish.filter(r=>r._group==="Other Fish")]];app.innerHTML=header("Fish","Choose a habitat/category","Index / Wiki","wiki")+`<main><div class="listcards">${cats.map(c=>`<button class="nav-card" onclick="fishCat('${c[0]}')"><span class="nav-icon">${c[1]}</span><span class="grow"><b>${c[0]}</b><small>${c[2].length} fish</small></span><span>›</span></button>`).join("")}</div></main>`}
+function fishCat(name){let arr=DB.fish.filter(r=>r._group===name);app.innerHTML=header(name,`${arr.length} fish`,"Fish","wiki:fish")+`<main><div class="searchbox"><input placeholder="Search fish..." oninput="filterCards(this.value,'fishList')"></div><div id="fishList" class="listcards">${arr.map(r=>`<button class="nav-card" onclick="fishDetail('${esc(r.Fish)}')"><span class="nav-icon">🐟</span><span class="grow"><b>${esc(r.Fish)}</b><small>${esc(r.Location)} • ${esc(r.Time)}</small></span><span>›</span></button>`).join("")}</div></main>`}
+function fishDetail(name){let r=DB.fish.find(x=>x.Fish===name),req=requiredFor("fish",r),cur=current("fish",name),s=star("fish",name);app.innerHTML=header(name,"Fish reference","Fish","wiki:fish")+`<main><div class="card"><div class="meta">${details("fish",r)}</div><div class="section-title"><h3>Collection & Mastery</h3></div><p><b>${cur}</b> / ${req||"—"} mastered</p>${req?`<div class="bar"><i style="width:${Math.min(100,cur/req*100)}%"></i></div>`:""}<div class="controls"><button class="set" onclick="setMastery('fish',${DB.fish.indexOf(r)})">Update mastery</button><select onchange="setStar('fish','${esc(name)}',this.value);fishDetail('${esc(name)}')">${[1,2,3,4,5].map(n=>`<option ${s===n?"selected":""}>${n}</option>`).join("")}</select></div></div><div class="section-title"><h3>Star Prices</h3></div><div class="card pricegrid">${[1,2,3,4,5].map(n=>`<span>⭐${n}</span><b>${r[n+"* Price"]??"—"}</b>`).join("")}</div></main>`}
+
+function animals(){app.innerHTML=header("Animal Bonds","Bond levels, possible foods and unlock notes")+`<main><div class="section-title"><h2>Animals</h2></div><div class="listcards">${DB.animals.map(a=>animalCard(a,false)).join("")}</div><div class="section-title"><h2>Limited-Time</h2></div><div class="listcards">${DB.limitedAnimals.map(a=>animalCard(a,true)).join("")}</div></main>`}
+function animalCard(a,limited){return `<button class="nav-card" onclick="go('pet:${esc(a.name)}')"><span class="nav-icon">${limited?"⏳":"🐾"}</span><span class="grow"><b>${esc(a.name)}</b><small>Bond ${progress.bondLevels[a.name]??0} / ${a.maxLevel}</small></span><span>›</span></button>`}
+function petDetail(name){let a=[...DB.animals,...DB.limitedAnimals].find(x=>x.name===name);let species=name;if(!a){a={name,possibleFoods:name==="Cat"?DB.petFoods.cats:DB.petFoods.dogs,maxLevel:0,location:"",weather:""};species=name}let fav=progress.bondFavs[name]||"",foods=a.possibleFoods||[];app.innerHTML=header(name,"Animal bond & food tracker","Animal Bonds","animals")+`<main><div class="card"><div class="two"><label class="field"><span>Bond level</span><input id="bond" type="number" min="0" max="${a.maxLevel}" value="${progress.bondLevels[name]??0}"></label><div><div class="eyebrow">MAX</div><div class="level smalllevel">${a.maxLevel}</div></div></div><p>📍 ${esc(a.location||"")}<br>☁️ ${esc(a.weather||"")}</p><button class="primary" onclick="saveBond('${esc(name)}')">Save bond level</button></div><div class="section-title"><h2>Favourite Food Trials</h2></div><div class="card list">${foods.map((f,i)=>`<label class="checkrow"><input type="checkbox" ${progress.petFood?.[name]?.[f]?"checked":""} onchange="foodTrial('${esc(name)}','${esc(f)}',this.checked)"><span>${esc(f)}</span></label>`).join("")}</div><div class="card pinned"><div class="eyebrow">PINNED FAVOURITE</div><h3>${fav?`⭐ ${esc(fav)}`:"None pinned yet"}</h3><select onchange="pinFood('${esc(name)}',this.value)"><option value="">Choose favourite…</option>${foods.map(f=>`<option ${fav===f?"selected":""}>${esc(f)}</option>`).join("")}</select></div><div class="section-title"><h2>Notable bond levels & unlocks</h2></div><div class="card"><textarea id="bondnotes" placeholder="Add your notes here...">${esc(progress.bondNotes?.[name]||"")}</textarea><button class="primary" onclick="saveBondNotes('${esc(name)}')">Save notes</button></div></main>`}
+function saveBond(name){progress.bondLevels[name]=Math.max(0,Number(document.getElementById("bond").value)||0);save();go("animals")}
+function saveBondNotes(name){progress.bondNotes=progress.bondNotes||{};progress.bondNotes[name]=document.getElementById("bondnotes").value;save()}
+function foodTrial(name,food,on){progress.petFood=progress.petFood||{};progress.petFood[name]=progress.petFood[name]||{};progress.petFood[name][food]=on;save()}
+function pinFood(name,f){progress.bondFavs[name]=f;save();petDetail(name)}
+
+function petsHome(){app.innerHTML=header("Pets","Food trials and pinned favourites","Heartopia","game")+`<main><div class="listcards"><button class="nav-card" onclick="go('pet:Cat')"><span class="nav-icon">🐱</span><span class="grow"><b>Cats</b><small>Food trial checklist</small></span><span>›</span></button><button class="nav-card" onclick="go('pet:Dog')"><span class="nav-icon">🐶</span><span class="grow"><b>Dogs</b><small>Food trial checklist</small></span><span>›</span></button></div></main>`}
+
+function events(){app.innerHTML=header("Events & Fashionwaves","Each event can become its own collection","Heartopia","game")+`<main><div class="empty card">No event records have been added from the database yet.</div><button class="primary" onclick="addEvent()">＋ Add Event</button></main>`}
+function addEvent(){let n=prompt("Event / Festival / Fashionwave name");if(n){progress.customEvents.push({name:n,collections:[],gacha:[]});save();events()}}
+
+render("home");
