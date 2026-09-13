@@ -1,0 +1,8 @@
+{
+  "name": "Game Index",
+  "short_name": "Game Index",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f7f5fb",
+  "theme_color": "#8d78d8"
+}
