@@ -1,10 +1,5 @@
-# Game Index — Heartopia v5
+# Game Index — Heartopia v6
 
-Clean Heartopia-focused index and tracker.
+Clean build with DG auto-leveling, obtained tracking, multiple named pets, static animal favourite foods, and cache retirement.
 
-- DG level starts at 0 for new users.
-- Personal progress is stored locally on each device/browser.
-- Every database item can be marked Obtained.
-- Mastery is tracked separately where a mastery requirement exists.
-- Individual pets can be added with separate food trials and pinned favourites.
-- Animal Bonds use the supplied fixed favourite-food information.
+Personal progress is stored locally per browser/device under the v6 storage key.

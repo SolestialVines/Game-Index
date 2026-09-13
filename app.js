@@ -1,7 +1,8 @@
 
 const DB=window.GAME_DB;
 const app=document.getElementById("app");
-const STORE_KEY="gameIndexProgressV5";
+const STORE_KEY="gameIndexProgressV6";
+const APP_VERSION="6.0";
 let progress=JSON.parse(localStorage.getItem(STORE_KEY)||"null")||{
  dg:{level:0,current:0},
  mastery:{}, stars:{}, obtained:{}, bondLevels:{}, bondFavs:{}, petFood:{cats:{},dogs:{}}, hobbyLevels:{}, hobbyNotes:{}, collectionItems:{}, customEvents:[]
@@ -29,7 +30,7 @@ function current(type,name){return progress.mastery[masteryKey(type,name)]??0}
 function setCurrent(type,name,n){progress.mastery[masteryKey(type,name)]=Math.max(0,Math.floor(Number(n)||0));save()}
 function setStar(type,name,n){progress.stars[masteryKey(type,name)]=Math.max(1,Math.min(5,Number(n)||1));save()}
 function header(title,sub,backText="Heartopia",back="home"){
-return `<header>${back?`<button class="back" onclick="go('${back}')">‹ ${esc(backText)}</button>`:""}<div class="eyebrow">GAME INDEX</div><h1>${esc(title)}</h1>${sub?`<p class="subtitle">${esc(sub)}</p>`:""}</header>`}
+return `<header>${back?`<button class="back" onclick="go('${back}')">‹ ${esc(backText)}</button>`:""}<div class="eyebrow">GAME INDEX · V${APP_VERSION}</div><h1>${esc(title)}</h1>${sub?`<p class="subtitle">${esc(sub)}</p>`:""}</header>`}
 function go(v){render(v)}
 function render(v="home"){window.currentView=v; if(v==="home")home();else if(v==="game")game();else if(v==="mastery")masteryHome();else if(v.startsWith("mastery:"))masteryCategory(v.split(":")[1]);else if(v==="wiki")wikiHome();else if(v.startsWith("wiki:"))wikiCategory(v.split(":")[1]);else if(v==="pets")petsHome();else if(v.startsWith("pet:"))petDetail(v.split(":")[1]);else if(v==="hobbies")hobbies();else if(v.startsWith("hobby:"))hobbyDetail(Number(v.split(":")[1]));else if(v==="collections")collections();else if(v.startsWith("collection:"))collectionCategory(v.split(":")[1]);else if(v==="tasks")tasks();else if(v==="animals")animals();else if(v.startsWith("animal:"))animalDetail(v.slice(7));else if(v==="events")events()}
 function home(){app.innerHTML=header("Game Index","Your personal gaming wiki & tracker","",null)+`<main>
@@ -46,11 +47,29 @@ const sections=[
 ["pets","🐶","Pets","Food trials & pinned favourites"]
 ];
 const PREMIUM_HOBBY_TICKET_LEVELS=[51,52,54,55,56,57,58,60,61];
+function dgRequirementForNextLevel(){
+  const next=DB.dgLevels.find(x=>x.level===progress.dg.level+1);
+  return Number(next?.required)||0;
+}
+function normalizeDG(){
+  let levelsGained=0;
+  let guard=0;
+  while(progress.dg.level>0 && guard++<100){
+    const req=dgRequirementForNextLevel();
+    if(!req || progress.dg.current<req) break;
+    progress.dg.current-=req;
+    progress.dg.level+=1;
+    levelsGained+=1;
+  }
+  return levelsGained;
+}
 function saveDGLevel(){
-  const n=Math.max(0,Math.floor(Number(document.getElementById("dgLevel")?.value)||0));
-  progress.dg.level=n;
+  progress.dg.level=Math.max(0,Math.floor(Number(document.getElementById("dgLevel")?.value)||0));
   progress.dg.current=Math.max(0,Math.floor(Number(document.getElementById("dgCurrent")?.value)||0));
-  save();game();
+  const gained=normalizeDG();
+  save();
+  if(gained) alert(`DG level increased to ${progress.dg.level}!`);
+  game();
 }
 function game(){
   let dg=DB.dgLevels.find(x=>x.level===progress.dg.level+1);
@@ -67,8 +86,29 @@ ${dg&&PREMIUM_HOBBY_TICKET_LEVELS.includes(dg.level)?`<p class="badge">⭐ Next 
 </main>`}
 function tasks(){let dg=DB.dgLevels.find(x=>x.level===progress.dg.level+1);let req=dg?.required??0;
 app.innerHTML=header("Daily & Weekly Tasks","5 daily tasks + 1 weekly task")+`<main><div class="card"><div class="eyebrow">DG LEVEL</div><div class="level">${progress.dg.level}</div><p>${progress.dg.current} / ${req} contribution points</p><div class="bar"><i style="width:${req?Math.min(100,progress.dg.current/req*100):100}%"></i></div><button class="primary" onclick="addContribution()">＋ Add contribution</button></div><div class="section-title"><h2>Daily Tasks</h2></div><div class="card list">${[1,2,3,4,5].map((n,i)=>`<label class="checkrow"><input type="checkbox" ${progress[`daily${i}`]?'checked':''} onchange="daily(${i},this.checked)"><span>Daily Task ${n}</span><em>+10</em></label>`).join("")}</div><div class="section-title"><h2>Weekly Task</h2></div><div class="card"><label class="checkrow"><input type="checkbox" ${progress.weekly?'checked':''} onchange="progress.weekly=this.checked;save()"><span>Weekly Task</span></label></div></main>`}
-function daily(i,on){progress["daily"+i]=on; if(on)progress.dg.current+=10;else progress.dg.current=Math.max(0,progress.dg.current-10);save();tasks()}
-function addContribution(){let n=prompt("Contribution points to add",10);if(n!==null){progress.dg.current=Math.max(0,Number(progress.dg.current)+Number(n||0));save();tasks()}}
+function daily(i,on){
+  progress["daily"+i]=on;
+  if(on){
+    progress.dg.current+=10;
+    const gained=normalizeDG();
+    save();
+    if(gained) alert(`DG level increased to ${progress.dg.level}!`);
+  }else{
+    progress.dg.current=Math.max(0,progress.dg.current-10);
+    save();
+  }
+  tasks();
+}
+function addContribution(){
+  let n=prompt("Contribution points to add",10);
+  if(n!==null){
+    progress.dg.current=Math.max(0,Number(progress.dg.current)+Number(n||0));
+    const gained=normalizeDG();
+    save();
+    if(gained) alert(`DG level increased to ${progress.dg.level}!`);
+    tasks();
+  }
+}
 
 const masteryGroups=[
 ["flowers","Flowers","🌷",DB.flowers, "Flower"],
