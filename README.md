@@ -1,5 +1,3 @@
-# Game Index — Heartopia v6
+# Game Index — Heartopia v7
 
-Clean build with DG auto-leveling, obtained tracking, multiple named pets, static animal favourite foods, and cache retirement.
-
-Personal progress is stored locally per browser/device under the v6 storage key.
+Functional obtained tracking, star ratings, collection totals, named pets with individual fish trials, Settings, flower crossbreeding guide, and updated reference notes.
